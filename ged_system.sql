@@ -8,8 +8,8 @@ CREATE TABLE usuarios (
     email VARCHAR(100) UNIQUE NOT NULL,
     senha_hash VARCHAR(255) NOT NULL, -- Armazenar o hash da senha
     salt VARCHAR(255), -- Salt para senha
-    tipo ENUM('cliente', 'auditor', 'admin') NOT NULL, -- Adicionado 'admin' para maior controle
-    status ENUM('ativo', 'inativo') DEFAULT 'ativo', -- Adiciona controle de status
+    tipo ENUM('cliente', 'auditor', 'admin') NOT NULL, -- Controle de tipos de usuários
+    status ENUM('ativo', 'inativo') DEFAULT 'ativo', -- Controle de status
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX (email) -- Índice para melhorar a busca por email
@@ -19,7 +19,7 @@ CREATE TABLE usuarios (
 CREATE TABLE departamentos (
     id_departamento INT AUTO_INCREMENT PRIMARY KEY,
     nome_departamento VARCHAR(100) NOT NULL,
-    status ENUM('ativo', 'inativo') DEFAULT 'ativo', -- Controle de status para departamentos
+    status ENUM('ativo', 'inativo') DEFAULT 'ativo', -- Controle de status
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -34,7 +34,7 @@ CREATE TABLE colaboradores (
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (id_departamento) REFERENCES departamentos(id_departamento) ON DELETE SET NULL,
-    INDEX (id_departamento) -- Índice para melhorar o desempenho de consultas de colaboradores por departamento
+    INDEX (id_departamento) -- Índice para melhorar o desempenho de consultas
 );
 
 -- Tabela de documentos
@@ -44,15 +44,26 @@ CREATE TABLE documentos (
     descricao TEXT,
     arquivo_pdf VARCHAR(255) NOT NULL, -- Caminho ou URL do arquivo PDF
     id_colaborador INT,
-    status ENUM('ativo', 'arquivado', 'excluido') DEFAULT 'ativo', -- Controle de status do documento
+    id_tipo INT, -- Relacionamento com tipos de documentos
+    status ENUM('ativo', 'arquivado', 'excluido') DEFAULT 'ativo', -- Controle de status
     data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (id_colaborador) REFERENCES colaboradores(id_colaborador) ON DELETE CASCADE,
-    INDEX (status) -- Índice para melhorar o desempenho em consultas filtrando pelo status
+    FOREIGN KEY (id_tipo) REFERENCES tipos_documentos(id_tipo) ON DELETE SET NULL,
+    INDEX (status) -- Índice para melhorar a performance nas consultas por status
 );
 
--- Tabela de logs de auditoria detalhada (auditoria em todas as tabelas)
+-- Tabela de tipos de documentos
+CREATE TABLE tipos_documentos (
+    id_tipo INT AUTO_INCREMENT PRIMARY KEY,
+    nome_tipo VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    status ENUM('ativo', 'inativo') DEFAULT 'ativo', -- Controle de status
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela de logs de auditoria detalhada
 CREATE TABLE logs_auditoria (
     id_log INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT,
@@ -63,8 +74,8 @@ CREATE TABLE logs_auditoria (
     motivo TEXT, -- Motivo da alteração (se fornecido)
     data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
-    INDEX (tabela_afetada), -- Índice para melhorar a consulta por tabela afetada
-    INDEX (data_hora) -- Índice para melhorar o desempenho de consultas por data
+    INDEX (tabela_afetada), -- Índice para melhorar as consultas por tabela afetada
+    INDEX (data_hora) -- Índice para melhorar o desempenho por data
 );
 
 -- Tabela de permissões hierárquicas
@@ -80,28 +91,20 @@ CREATE TABLE permissoes (
     INDEX (id_departamento) -- Índice para melhorar as consultas por departamento
 );
 
--- Tabela de auditoria de documentos (caso haja necessidade de auditoria sobre alterações de documentos)
+-- Tabela de auditoria de documentos
 CREATE TABLE auditoria_documentos (
     id_auditoria INT AUTO_INCREMENT PRIMARY KEY,
     id_documento INT,
-    acao VARCHAR(100) NOT NULL, -- Descrição da ação (ex: "Atualização", "Arquivamento")
+    acao VARCHAR(100) NOT NULL, -- Ação realizada (ex: "Atualização", "Arquivamento")
     dados_anteriores TEXT, -- Dados antes da alteração
     dados_novos TEXT, -- Dados após a alteração
+    motivo TEXT, -- Motivo da alteração
     data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_documento) REFERENCES documentos(id_documento) ON DELETE CASCADE,
     INDEX (id_documento) -- Índice para melhorar consultas por documento
 );
 
--- Tabela de tipos de documentos (adiciona mais flexibilidade para classificação de documentos)
-CREATE TABLE tipos_documentos (
-    id_tipo INT AUTO_INCREMENT PRIMARY KEY,
-    nome_tipo VARCHAR(100) NOT NULL,
-    descricao TEXT,
-    status ENUM('ativo', 'inativo') DEFAULT 'ativo',
-    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Tabela de histórico de documentos (historico completo de alterações em documentos)
+-- Tabela de histórico de documentos
 CREATE TABLE historico_documentos (
     id_historico INT AUTO_INCREMENT PRIMARY KEY,
     id_documento INT,
@@ -109,11 +112,19 @@ CREATE TABLE historico_documentos (
     id_usuario INT,
     dados_anteriores TEXT, -- Dados antes da alteração
     dados_novos TEXT, -- Dados após a alteração
-    motivo TEXT, -- Motivo para a alteração
+    motivo TEXT, -- Motivo da alteração
     data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_documento) REFERENCES documentos(id_documento) ON DELETE CASCADE,
-    FOREIGN KEY (id_acao) REFERENCES tipos_documentos(id_tipo),
+    FOREIGN KEY (id_acao) REFERENCES acoes(id_acao),
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE
+);
+
+-- Tabela de ações
+CREATE TABLE acoes (
+    id_acao INT AUTO_INCREMENT PRIMARY KEY,
+    nome_acao VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Trigger para auditar alterações de documentos
@@ -122,10 +133,10 @@ CREATE TRIGGER audit_documentos_update
 AFTER UPDATE ON documentos
 FOR EACH ROW
 BEGIN
-    INSERT INTO auditoria_documentos (id_documento, acao, dados_anteriores, dados_novos)
-    VALUES (OLD.id_documento, 'Atualização', CONCAT('Titulo: ', OLD.titulo, ', Descricao: ', OLD.descricao), CONCAT('Titulo: ', NEW.titulo, ', Descricao: ', NEW.descricao));
-    INSERT INTO historico_documentos (id_documento, id_acao, id_usuario, dados_anteriores, dados_novos)
-    VALUES (NEW.id_documento, 1, OLD.id_colaborador, CONCAT('Titulo: ', OLD.titulo, ', Descricao: ', OLD.descricao), CONCAT('Titulo: ', NEW.titulo, ', Descricao: ', NEW.descricao));
+    INSERT INTO auditoria_documentos (id_documento, acao, dados_anteriores, dados_novos, motivo)
+    VALUES (OLD.id_documento, 'Atualização', CONCAT('Titulo: ', OLD.titulo, ', Descricao: ', OLD.descricao), CONCAT('Titulo: ', NEW.titulo, ', Descricao: ', NEW.descricao), 'Atualização de título e descrição');
+    INSERT INTO historico_documentos (id_documento, id_acao, id_usuario, dados_anteriores, dados_novos, motivo)
+    VALUES (NEW.id_documento, 1, OLD.id_colaborador, CONCAT('Titulo: ', OLD.titulo, ', Descricao: ', OLD.descricao), CONCAT('Titulo: ', NEW.titulo, ', Descricao: ', NEW.descricao), 'Alteração dos detalhes do documento');
 END;
 //
 DELIMITER ;
