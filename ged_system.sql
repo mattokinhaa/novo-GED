@@ -8,7 +8,7 @@ CREATE TABLE usuarios (
     email VARCHAR(100) UNIQUE NOT NULL,
     senha_hash VARCHAR(255) NOT NULL, -- Armazenar o hash da senha
     salt VARCHAR(255), -- Salt para senha
-    tipo ENUM('cliente', 'auditor') NOT NULL,
+    tipo ENUM('cliente', 'auditor', 'admin') NOT NULL, -- Adicionado 'admin' para maior controle
     status ENUM('ativo', 'inativo') DEFAULT 'ativo', -- Adiciona controle de status
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -52,24 +52,29 @@ CREATE TABLE documentos (
     INDEX (status) -- Índice para melhorar o desempenho em consultas filtrando pelo status
 );
 
--- Tabela de logs de auditoria (geral)
+-- Tabela de logs de auditoria detalhada (auditoria em todas as tabelas)
 CREATE TABLE logs_auditoria (
     id_log INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT,
-    acao VARCHAR(100) NOT NULL,
-    detalhes TEXT,
+    tabela_afetada VARCHAR(100) NOT NULL, -- Qual tabela foi afetada
+    id_registro INT NOT NULL, -- Qual registro foi afetado
+    acao VARCHAR(100) NOT NULL, -- Ação realizada (Insert, Update, Delete)
+    detalhes TEXT, -- Detalhes sobre a ação
+    motivo TEXT, -- Motivo da alteração (se fornecido)
     data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
-    INDEX (id_usuario) -- Índice para melhorar as consultas por usuário
+    INDEX (tabela_afetada), -- Índice para melhorar a consulta por tabela afetada
+    INDEX (data_hora) -- Índice para melhorar o desempenho de consultas por data
 );
 
--- Tabela de permissões
+-- Tabela de permissões hierárquicas
 CREATE TABLE permissoes (
     id_permissao INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT,
     id_departamento INT, -- Relaciona permissões a departamentos
     entidade VARCHAR(50),
     permissao ENUM('consultar', 'atualizar', 'deletar') NOT NULL,
+    nivel_permicao ENUM('baixo', 'medio', 'alto') DEFAULT 'baixo', -- Controle hierárquico de permissões
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
     FOREIGN KEY (id_departamento) REFERENCES departamentos(id_departamento) ON DELETE CASCADE,
     INDEX (id_departamento) -- Índice para melhorar as consultas por departamento
@@ -96,23 +101,18 @@ CREATE TABLE tipos_documentos (
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela de ações (para auditar ações específicas, como criação, atualização ou exclusão)
-CREATE TABLE acoes (
-    id_acao INT AUTO_INCREMENT PRIMARY KEY,
-    nome_acao VARCHAR(100) NOT NULL,
-    descricao TEXT,
-    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Tabela de histórico de documentos (historico completo de alterações em documentos)
 CREATE TABLE historico_documentos (
     id_historico INT AUTO_INCREMENT PRIMARY KEY,
     id_documento INT,
     id_acao INT,
     id_usuario INT,
+    dados_anteriores TEXT, -- Dados antes da alteração
+    dados_novos TEXT, -- Dados após a alteração
+    motivo TEXT, -- Motivo para a alteração
     data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_documento) REFERENCES documentos(id_documento) ON DELETE CASCADE,
-    FOREIGN KEY (id_acao) REFERENCES acoes(id_acao),
+    FOREIGN KEY (id_acao) REFERENCES tipos_documentos(id_tipo),
     FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE
 );
 
@@ -124,6 +124,8 @@ FOR EACH ROW
 BEGIN
     INSERT INTO auditoria_documentos (id_documento, acao, dados_anteriores, dados_novos)
     VALUES (OLD.id_documento, 'Atualização', CONCAT('Titulo: ', OLD.titulo, ', Descricao: ', OLD.descricao), CONCAT('Titulo: ', NEW.titulo, ', Descricao: ', NEW.descricao));
+    INSERT INTO historico_documentos (id_documento, id_acao, id_usuario, dados_anteriores, dados_novos)
+    VALUES (NEW.id_documento, 1, OLD.id_colaborador, CONCAT('Titulo: ', OLD.titulo, ', Descricao: ', OLD.descricao), CONCAT('Titulo: ', NEW.titulo, ', Descricao: ', NEW.descricao));
 END;
 //
 DELIMITER ;
