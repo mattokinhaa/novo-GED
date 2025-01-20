@@ -127,4 +127,3 @@ BEGIN
 END;
 //
 DELIMITER ;
-s
