@@ -1,172 +1,142 @@
--- Criar banco de dados
-CREATE DATABASE IF NOT EXISTS ged_system
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE SiMGeD;
+USE SiMGeD;
 
-USE ged_system;
-
--- Tabela de Funcionários
-CREATE TABLE funcionarios (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(255) NOT NULL,
-    cpf VARCHAR(14) UNIQUE NOT NULL,
-    data_nascimento DATE,
-    email VARCHAR(255),
-    telefone VARCHAR(20),
-    cargo VARCHAR(100),
-    departamento VARCHAR(100),
-    data_admissao DATE,
-    status ENUM('Ativo', 'Inativo') DEFAULT 'Ativo',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_nome (nome),
-    INDEX idx_cpf (cpf),
-    INDEX idx_departamento (departamento)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Tabela de Empresas
-CREATE TABLE empresas (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    razao_social VARCHAR(255) NOT NULL,
-    nome_fantasia VARCHAR(255),
-    cnpj VARCHAR(18) UNIQUE NOT NULL,
-    inscricao_estadual VARCHAR(20),
-    endereco VARCHAR(255),
-    numero VARCHAR(10),
-    complemento VARCHAR(100),
-    bairro VARCHAR(100),
-    cidade VARCHAR(100),
-    estado CHAR(2),
-    cep VARCHAR(9),
-    telefone VARCHAR(20),
-    email VARCHAR(255),
-    status ENUM('Ativa', 'Inativa') DEFAULT 'Ativa',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_razao_social (razao_social),
-    INDEX idx_cnpj (cnpj)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Tabela de Usuários
+-- Tabela de usuários
 CREATE TABLE usuarios (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    nivel_acesso ENUM('Admin', 'Gestor', 'Usuario') DEFAULT 'Usuario',
-    ultimo_acesso DATETIME,
-    status ENUM('Ativo', 'Inativo') DEFAULT 'Ativo',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_email (email),
-    INDEX idx_username (username)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    id_usuario INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    senha_hash VARCHAR(255) NOT NULL, -- Armazenar o hash da senha
+    salt VARCHAR(255), -- Salt para senha
+    tipo ENUM('cliente', 'auditor', 'admin') NOT NULL, -- Controle de tipos de usuários
+    status ENUM('ativo', 'inativo') DEFAULT 'ativo', -- Controle de status
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX (email) -- Índice para melhorar a busca por email
+);
 
--- Tabela de Documentos
+-- Tabela de departamentos
+CREATE TABLE departamentos (
+    id_departamento INT AUTO_INCREMENT PRIMARY KEY,
+    nome_departamento VARCHAR(100) NOT NULL,
+    status ENUM('ativo', 'inativo') DEFAULT 'ativo', -- Controle de status
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Tabela de colaboradores
+CREATE TABLE colaboradores (
+    id_colaborador INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    foto_3x4 VARCHAR(255), -- Caminho ou URL da foto
+    id_departamento INT,
+    ativo BOOLEAN DEFAULT TRUE, -- Controle de status ativo/inativo
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_departamento) REFERENCES departamentos(id_departamento) ON DELETE SET NULL,
+    INDEX (id_departamento) -- Índice para melhorar o desempenho de consultas
+);
+
+-- Tabela de documentos
 CREATE TABLE documentos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    titulo VARCHAR(255) NOT NULL,
+    id_documento INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(100) NOT NULL,
     descricao TEXT,
-    tipo_documento ENUM('Contrato', 'Nota Fiscal', 'Relatório', 'RG', 'CPF', 'Certidão', 'Outros') NOT NULL,
-    numero_documento VARCHAR(50),
-    data_documento DATE,
-    data_vencimento DATE,
-    id_funcionario INT,
-    id_empresa INT,
-    caminho_arquivo VARCHAR(255) NOT NULL,
-    tamanho_arquivo INT,
-    tipo_arquivo VARCHAR(50),
-    status ENUM('Ativo', 'Arquivado', 'Excluído') DEFAULT 'Ativo',
-    created_by INT,
-    updated_by INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_funcionario) REFERENCES funcionarios(id),
-    FOREIGN KEY (id_empresa) REFERENCES empresas(id),
-    FOREIGN KEY (created_by) REFERENCES usuarios(id),
-    FOREIGN KEY (updated_by) REFERENCES usuarios(id),
-    INDEX idx_titulo (titulo),
-    INDEX idx_tipo_documento (tipo_documento),
-    INDEX idx_data_documento (data_documento),
-    INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    arquivo_pdf VARCHAR(255) NOT NULL, -- Caminho ou URL do arquivo PDF
+    id_colaborador INT,
+    id_tipo INT, -- Relacionamento com tipos de documentos
+    status ENUM('ativo', 'arquivado', 'excluido') DEFAULT 'ativo', -- Controle de status
+    data_upload TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_colaborador) REFERENCES colaboradores(id_colaborador) ON DELETE CASCADE,
+    FOREIGN KEY (id_tipo) REFERENCES tipos_documentos(id_tipo) ON DELETE SET NULL,
+    INDEX (status) -- Índice para melhorar a performance nas consultas por status
+);
 
--- Tabela de Categorias de Documentos
-CREATE TABLE categorias_documentos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(100) NOT NULL,
+-- Tabela de tipos de documentos
+CREATE TABLE tipos_documentos (
+    id_tipo INT AUTO_INCREMENT PRIMARY KEY,
+    nome_tipo VARCHAR(100) NOT NULL,
     descricao TEXT,
-    status ENUM('Ativa', 'Inativa') DEFAULT 'Ativa',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_nome (nome)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    status ENUM('ativo', 'inativo') DEFAULT 'ativo', -- Controle de status
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Tabela de Relacionamento entre Documentos e Categorias
-CREATE TABLE documento_categoria (
-    id_documento INT,
-    id_categoria INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id_documento, id_categoria),
-    FOREIGN KEY (id_documento) REFERENCES documentos(id),
-    FOREIGN KEY (id_categoria) REFERENCES categorias_documentos(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Tabela de Log de Ações
-CREATE TABLE log_acoes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+-- Tabela de logs de auditoria detalhada
+CREATE TABLE logs_auditoria (
+    id_log INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT,
-    acao VARCHAR(50) NOT NULL,
-    tabela_afetada VARCHAR(50) NOT NULL,
-    id_registro INT,
-    dados_anteriores TEXT,
-    dados_novos TEXT,
-    ip_address VARCHAR(45),
-    user_agent VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_usuario) REFERENCES usuarios(id),
-    INDEX idx_acao (acao),
-    INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    tabela_afetada VARCHAR(100) NOT NULL, -- Qual tabela foi afetada
+    id_registro INT NOT NULL, -- Qual registro foi afetado
+    acao VARCHAR(100) NOT NULL, -- Ação realizada (Insert, Update, Delete)
+    detalhes TEXT, -- Detalhes sobre a ação
+    motivo TEXT, -- Motivo da alteração (se fornecido)
+    data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    INDEX (tabela_afetada), -- Índice para melhorar as consultas por tabela afetada
+    INDEX (data_hora) -- Índice para melhorar o desempenho por data
+);
 
--- Tabela de Permissões
+-- Tabela de permissões hierárquicas
 CREATE TABLE permissoes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(100) NOT NULL,
-    descricao TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_nome (nome)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Tabela de Relacionamento entre Usuários e Permissões
-CREATE TABLE usuario_permissao (
+    id_permissao INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario INT,
-    id_permissao INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id_usuario, id_permissao),
-    FOREIGN KEY (id_usuario) REFERENCES usuarios(id),
-    FOREIGN KEY (id_permissao) REFERENCES permissoes(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    id_departamento INT, -- Relaciona permissões a departamentos
+    entidade VARCHAR(50),
+    permissao ENUM('consultar', 'atualizar', 'deletar') NOT NULL,
+    nivel_permicao ENUM('baixo', 'medio', 'alto') DEFAULT 'baixo', -- Controle hierárquico de permissões
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE,
+    FOREIGN KEY (id_departamento) REFERENCES departamentos(id_departamento) ON DELETE CASCADE,
+    INDEX (id_departamento) -- Índice para melhorar as consultas por departamento
+);
 
--- Inserir dados iniciais para permissões
-INSERT INTO permissoes (nome, descricao) VALUES
-('visualizar_documentos', 'Permite visualizar documentos'),
-('criar_documentos', 'Permite criar novos documentos'),
-('editar_documentos', 'Permite editar documentos existentes'),
-('excluir_documentos', 'Permite excluir documentos'),
-('gerenciar_usuarios', 'Permite gerenciar usuários do sistema'),
-('gerenciar_permissoes', 'Permite gerenciar permissões do sistema'),
-('visualizar_logs', 'Permite visualizar logs do sistema');
+-- Tabela de auditoria de documentos
+CREATE TABLE auditoria_documentos (
+    id_auditoria INT AUTO_INCREMENT PRIMARY KEY,
+    id_documento INT,
+    acao VARCHAR(100) NOT NULL, -- Ação realizada (ex: "Atualização", "Arquivamento")
+    dados_anteriores TEXT, -- Dados antes da alteração
+    dados_novos TEXT, -- Dados após a alteração
+    motivo TEXT, -- Motivo da alteração
+    data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_documento) REFERENCES documentos(id_documento) ON DELETE CASCADE,
+    INDEX (id_documento) -- Índice para melhorar consultas por documento
+);
 
--- Inserir usuário administrador inicial
-INSERT INTO usuarios (nome, email, username, password_hash, nivel_acesso) VALUES
-('Administrador', 'admin@sistema.com', 'admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Admin');
+-- Tabela de histórico de documentos
+CREATE TABLE historico_documentos (
+    id_historico INT AUTO_INCREMENT PRIMARY KEY,
+    id_documento INT,
+    id_acao INT,
+    id_usuario INT,
+    dados_anteriores TEXT, -- Dados antes da alteração
+    dados_novos TEXT, -- Dados após a alteração
+    motivo TEXT, -- Motivo da alteração
+    data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_documento) REFERENCES documentos(id_documento) ON DELETE CASCADE,
+    FOREIGN KEY (id_acao) REFERENCES acoes(id_acao),
+    FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE
+);
 
--- Inserir categorias iniciais de documentos
-INSERT INTO categorias_documentos (nome, descricao) VALUES
-('Documentos Pessoais', 'Documentos de identificação e pessoais'),
-('Documentos Financeiros', 'Documentos relacionados a finanças'),
-('Contratos', 'Contratos e documentos legais'),
-('Relatórios', 'Relatórios diversos');
+-- Tabela de ações
+CREATE TABLE acoes (
+    id_acao INT AUTO_INCREMENT PRIMARY KEY,
+    nome_acao VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Trigger para auditar alterações de documentos
+DELIMITER //
+CREATE TRIGGER audit_documentos_update
+AFTER UPDATE ON documentos
+FOR EACH ROW
+BEGIN
+    INSERT INTO auditoria_documentos (id_documento, acao, dados_anteriores, dados_novos, motivo)
+    VALUES (OLD.id_documento, 'Atualização', CONCAT('Titulo: ', OLD.titulo, ', Descricao: ', OLD.descricao), CONCAT('Titulo: ', NEW.titulo, ', Descricao: ', NEW.descricao), 'Atualização de título e descrição');
+    INSERT INTO historico_documentos (id_documento, id_acao, id_usuario, dados_anteriores, dados_novos, motivo)
+    VALUES (NEW.id_documento, 1, OLD.id_colaborador, CONCAT('Titulo: ', OLD.titulo, ', Descricao: ', OLD.descricao), CONCAT('Titulo: ', NEW.titulo, ', Descricao: ', NEW.descricao), 'Alteração dos detalhes do documento');
+END;
+//
+DELIMITER ;
