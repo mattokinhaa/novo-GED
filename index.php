@@ -9,7 +9,7 @@ $page = $_GET['page'] ?? 1;
 $search = $_GET['search'] ?? '';
 $tipo = $_GET['tipo'] ?? '';
 
-$docs = $document->getDocuments($search, $tipo, $page);
+
 ?>
 
 <div class="container">
