@@ -16,10 +16,18 @@ section div.background-section{
     width: 100%;
     height: 100%;
     position: absolute;
+    z-index: 0;
 }
 section div.background-section video{
     width: 100%;
     height: 100%;
     object-fit: cover;
     object-position: center;
+}
+section div.box{
+    width: 50%;
+    height: 100%;
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.9), transparent);
 }
