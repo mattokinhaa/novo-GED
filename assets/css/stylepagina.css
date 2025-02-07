@@ -39,7 +39,7 @@ section div.box div.conteudo{
     width: 80%;
 }
 section div.box img{
-    width: 100%;
+    width: 70%;
     min-width: 300px;
 }
 section div.box p{
@@ -59,4 +59,11 @@ section div.box p{
         width: 100%;
         text-align: center;
     }
+}
+footer{
+    padding: 30px;
+    background-color: #52658C;
+    justify-content: center;
+    text-align: center;
+    color: #ffffff;
 }
